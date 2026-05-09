@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple
 from graphics import ContentManager
 from tile import Tile, TileCollision
 from player import Player
-from enemy import Enemy
+from inimigo import Inimigo
 from gem import Gem
 from geometry import get_bottom_center
 
@@ -32,7 +32,7 @@ class Level:
         # Entidades no nível
         self.player: Optional[Player] = None
         self.gems: List[Gem] = []
-        self.enemies: List[Enemy] = []
+        self.enemies: List[Inimigo] = []
 
         # Locais chave no nível
         self.start_position: pygame.math.Vector2 = pygame.math.Vector2(0, 0)
@@ -159,7 +159,7 @@ class Level:
     def _load_enemy_tile(self, x: int, y: int, sprite_set: str) -> Tile:
         """Instancia um inimigo e o coloca no nível."""
         position = get_bottom_center(self.get_bounds(x, y))
-        self.enemies.append(Enemy(self, position, sprite_set))
+        self.enemies.append(Inimigo(self, position, sprite_set))
         return Tile(None, TileCollision.PASSABLE)
 
     def _load_gem_tile(self, x: int, y: int) -> Tile:
@@ -201,7 +201,7 @@ class Level:
         """
         # Pausa enquanto o jogador estiver morto ou o tempo esgotado
         if not self.player.is_alive or self.time_remaining <= 0.0:
-            self.player.apply_physics(dt)
+            self.player.aplicar_fisica(dt)
         elif self.reached_exit:
             # Converte o tempo restante em pontos
             seconds = int(round(dt * 100.0))
@@ -214,7 +214,7 @@ class Level:
             self._update_gems(total_time)
 
             # Cair da base do nível mata o jogador
-            if self.player.bounding_rectangle.top >= self.height * Tile.HEIGHT:
+            if self.player.limites.top >= self.height * Tile.HEIGHT:
                 self.on_player_killed(None)
 
             self._update_enemies(dt)
@@ -222,7 +222,7 @@ class Level:
             # Checa se o jogador alcançou a saída
             if (self.player.is_alive and
                     self.player.is_on_ground and
-                    self.player.bounding_rectangle.collidepoint(self.exit_position.x, self.exit_position.y)):
+                    self.player.limites.collidepoint(self.exit_position.x, self.exit_position.y)):
                 self.on_exit_reached()
 
         # Garante que o tempo nunca seja negativo
@@ -237,7 +237,7 @@ class Level:
             gem.update(total_time)
 
             # Colisão circular básica com o retângulo do jogador
-            if gem.bounding_circle.intersects(self.player.bounding_rectangle):
+            if gem.limites.intersects(self.player.limites):
                 self._on_gem_collected(gem, self.player)
                 self.gems.pop(i)
 
@@ -246,18 +246,18 @@ class Level:
         for enemy in self.enemies:
             enemy.update(dt)
 
-            if enemy.bounding_rectangle.colliderect(self.player.bounding_rectangle):
+            if enemy.retangulo_limite.colliderect(self.player.limites):
                 self.on_player_killed(enemy)
 
     def _on_gem_collected(self, gem: Gem, collected_by: Player):
-        self.score += Gem.POINT_VALUE
+        self.score += Gem.PONTO
         gem.on_collected(collected_by)
 
-    def on_player_killed(self, killed_by: Optional[Enemy]):
-        self.player.on_killed(killed_by)
+    def on_player_killed(self, killed_by: Optional[Inimigo]):
+        self.player.morreu(killed_by)
 
     def on_exit_reached(self):
-        self.player.on_reached_exit()
+        self.player.colidiu_saida()
         self.exit_reached_sound.play()
         self.reached_exit = True
 

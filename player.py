@@ -10,90 +10,90 @@ class Player:
     """O nosso destemido aventureiro!"""
 
     # Constantes para controle de movimento horizontal
-    MOVE_ACCELERATION: float = 13000.0
-    MAX_MOVE_SPEED: float = 1750.0
-    GROUND_DRAG_FACTOR: float = 0.48
-    AIR_DRAG_FACTOR: float = 0.58
+    ACELERACAO: float = 13000.0
+    MAXIMO_VELOCIDADE: float = 1750.0
+    FATOR_TERRA: float = 0.48
+    FATOR_AR: float = 0.58
 
     # Constantes para controle de movimento vertical
-    MAX_JUMP_TIME: float = 0.35
-    JUMP_LAUNCH_VELOCITY: float = -3500.0
-    GRAVITY_ACCELERATION: float = 3400.0
-    MAX_FALL_SPEED: float = 550.0
-    JUMP_CONTROL_POWER: float = 0.14
+    TEMPO_PULO: float = 0.35
+    PULO_VELOCIDADE: float = -3500.0
+    GRAVIDADE: float = 3400.0
+    QUEDA_VELOCIDADE: float = 550.0
+    PULO_POTENCIA: float = 0.14
 
     def __init__(self, level, position: pygame.math.Vector2):
         self.level = level
 
         # Animações
-        self.idle_animation: Optional[Animation] = None
-        self.run_animation: Optional[Animation] = None
-        self.jump_animation: Optional[Animation] = None
-        self.celebrate_animation: Optional[Animation] = None
-        self.die_animation: Optional[Animation] = None
+        self.anim_espera: Optional[Animation] = None
+        self.andar_anim: Optional[Animation] = None
+        self.pulo_anim: Optional[Animation] = None
+        self.vitoria_anim: Optional[Animation] = None
+        self.morte_anim: Optional[Animation] = None
 
         # Estado de renderização
         self.flip_x: bool = False
         self.sprite: AnimationPlayer = AnimationPlayer()
 
         # Áudios
-        self.killed_sound: Optional[pygame.mixer.Sound] = None
-        self.jump_sound: Optional[pygame.mixer.Sound] = None
-        self.fall_sound: Optional[pygame.mixer.Sound] = None
+        self.som_perdeu: Optional[pygame.mixer.Sound] = None
+        self.som_pulo: Optional[pygame.mixer.Sound] = None
+        self.som_queda: Optional[pygame.mixer.Sound] = None
 
         # Estado da Física
-        self.position: pygame.math.Vector2 = pygame.math.Vector2(0, 0)
-        self.velocity: pygame.math.Vector2 = pygame.math.Vector2(0, 0)
+        self.posicao: pygame.math.Vector2 = pygame.math.Vector2(0, 0)
+        self.velocidade: pygame.math.Vector2 = pygame.math.Vector2(0, 0)
         self.is_alive: bool = True
         self.is_on_ground: bool = False
         self._previous_bottom: float = 0.0
 
         # Estado de Input e Pulo
         self.movement: float = 0.0
-        self.is_jumping: bool = False
-        self.was_jumping: bool = False
+        self.is_pulando: bool = False
+        self.pulou: bool = False
         self.jump_time: float = 0.0
 
         self._local_bounds: pygame.Rect = pygame.Rect(0, 0, 0, 0)
 
-        self.load_content()
+        self.carregar_conteudo()
         self.reset(position)
 
     @property
-    def bounding_rectangle(self) -> pygame.Rect:
+    def limites(self) -> pygame.Rect:
         """Obtém um retângulo que delimita este jogador no espaço do mundo."""
         # math.floor ou round() para converter as coordenadas espaciais float para int do Rect
-        left = round(self.position.x - self.sprite.origin.x) + self._local_bounds.x
-        top = round(self.position.y - self.sprite.origin.y) + self._local_bounds.y
+        left = round(self.posicao.x - self.sprite.origin.x) + self._local_bounds.x
+        top = round(self.posicao.y - self.sprite.origin.y) + self._local_bounds.y
         return pygame.Rect(left, top, self._local_bounds.width, self._local_bounds.height)
 
-    def load_content(self):
+    def carregar_conteudo(self):
         """Carrega a spritesheet do jogador e os sons."""
         # Carrega texturas animadas usando o nosso ContentManager
-        self.idle_animation = Animation("Sprites/Player/Idle.png", 0.1, True)
-        self.run_animation = Animation("Sprites/Player/Run.png", 0.1, True)
-        self.jump_animation = Animation("Sprites/Player/Jump.png", 0.1, False)
-        self.celebrate_animation = Animation("Sprites/Player/Celebrate.png", 0.1, False)
-        self.die_animation = Animation("Sprites/Player/Die.png", 0.1, False)
+        self.anim_espera = Animation("Sprites/Player/Idle.png", 0.1, True)
+        self.andar_anim = Animation("Sprites/Player/Run.png", 0.1, True)
+        self.pulo_anim = Animation("Sprites/Player/Jump.png", 0.1, False)
+        self.vitoria_anim = Animation("Sprites/Player/Celebrate.png", 0.1, False)
+        self.morte_anim = Animation("Sprites/Player/Die.png", 0.1, False)
 
         # Calcula os limites (bounds) dentro do tamanho da textura
-        width = int(self.idle_animation.frame_width * 0.4)
-        left = (self.idle_animation.frame_width - width) // 2
-        height = int(self.idle_animation.frame_width * 0.8)
-        top = self.idle_animation.frame_height - height
+        width = int(self.anim_espera.frame_width * 0.4)
+        left = (self.anim_espera.frame_width - width) // 2
+        height = int(self.anim_espera.frame_width * 0.8)
+        top = self.anim_espera.frame_height - height
         self._local_bounds = pygame.Rect(left, top, width, height)
 
         # Carrega sons (Assumindo que você inicializou o pygame.mixer)
-        self.killed_sound = ContentManager.load_sound("Sounds/STAY_SE_00016.wav")
-        self.jump_sound = ContentManager.load_sound("Sounds/STAY_SE_00010.wav")
-        self.fall_sound = ContentManager.load_sound("Sounds/STAY_SE_00016.wav")
+        self.som_perdeu = ContentManager.load_sound("Sounds/STAY_SE_00016.wav")
+        self.som_pulo = ContentManager.load_sound("Sounds/STAY_SE_00010.wav")
+        self.som_queda = ContentManager.load_sound("Sounds/STAY_SE_00016.wav")
 
     def reset(self, position: pygame.math.Vector2):
         """Ressuscita e reposiciona o jogador."""
-        self.position = pygame.math.Vector2(position)
-        self.velocity = pygame.math.Vector2(0, 0)
+        self.posicao = pygame.math.Vector2(position)
+        self.velocidade = pygame.math.Vector2(0, 0)
         self.is_alive = True
-        self.sprite.play_animation(self.idle_animation)
+        self.sprite.play_animation(self.anim_espera)
 
     def update(self, dt: float):
         """
@@ -101,18 +101,18 @@ class Player:
         Substitui o GameTime pelo dt (delta time em segundos).
         """
         self.get_input()
-        self.apply_physics(dt)
+        self.aplicar_fisica(dt)
 
         if self.is_alive and self.is_on_ground:
             # Seleciona a animação baseada na velocidade horizontal
-            if abs(self.velocity.x) - 0.02 > 0:
-                self.sprite.play_animation(self.run_animation)
+            if abs(self.velocidade.x) - 0.02 > 0:
+                self.sprite.play_animation(self.andar_anim)
             else:
-                self.sprite.play_animation(self.idle_animation)
+                self.sprite.play_animation(self.anim_espera)
 
         # Limpa o input
         self.movement = 0.0
-        self.is_jumping = False
+        self.is_pulando = False
 
     def get_input(self):
         """Obtém comandos de movimento horizontal e pulo (Somente Desktop)."""
@@ -125,58 +125,58 @@ class Player:
             self.movement = 1.0
 
         # Pulo
-        self.is_jumping = keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]
+        self.is_pulando = keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]
 
-    def apply_physics(self, dt: float):
+    def aplicar_fisica(self, dt: float):
         """Atualiza a velocidade e posição do jogador baseado em input, gravidade, etc."""
-        previous_position = pygame.math.Vector2(self.position)
+        previous_position = pygame.math.Vector2(self.posicao)
 
         # Aceleração horizontal e gravidade
-        self.velocity.x += self.movement * self.MOVE_ACCELERATION * dt
-        self.velocity.y = clamp(self.velocity.y + self.GRAVITY_ACCELERATION * dt, -self.MAX_FALL_SPEED,
-                                self.MAX_FALL_SPEED)
+        self.velocidade.x += self.movement * self.ACELERACAO * dt
+        self.velocidade.y = clamp(self.velocidade.y + self.GRAVIDADE * dt, -self.QUEDA_VELOCIDADE,
+                                  self.QUEDA_VELOCIDADE)
 
-        self.velocity.y = self.do_jump(self.velocity.y, dt)
+        self.velocidade.y = self.pular(self.velocidade.y, dt)
 
         # Aplica pseudo-atrito horizontal
         if self.is_on_ground:
-            self.velocity.x *= self.GROUND_DRAG_FACTOR
+            self.velocidade.x *= self.FATOR_TERRA
         else:
-            self.velocity.x *= self.AIR_DRAG_FACTOR
+            self.velocidade.x *= self.FATOR_AR
 
         # Impede que o jogador corra mais rápido que a velocidade máxima
-        self.velocity.x = clamp(self.velocity.x, -self.MAX_MOVE_SPEED, self.MAX_MOVE_SPEED)
+        self.velocidade.x = clamp(self.velocidade.x, -self.MAXIMO_VELOCIDADE, self.MAXIMO_VELOCIDADE)
 
         # Aplica a velocidade à posição
-        self.position += self.velocity * dt
-        self.position.x = round(self.position.x)
-        self.position.y = round(self.position.y)
+        self.posicao += self.velocidade * dt
+        self.posicao.x = round(self.posicao.x)
+        self.posicao.y = round(self.posicao.y)
 
         # Resolve colisões com o cenário
-        self.handle_collisions()
+        self.gerenciar_colisao()
 
         # Se a colisão nos parou, zera a velocidade naquele eixo
-        if self.position.x == previous_position.x:
-            self.velocity.x = 0
-        if self.position.y == previous_position.y:
-            self.velocity.y = 0
+        if self.posicao.x == previous_position.x:
+            self.velocidade.x = 0
+        if self.posicao.y == previous_position.y:
+            self.velocidade.y = 0
 
-    def do_jump(self, velocity_y: float, dt: float) -> float:
+    def pular(self, velocity_y: float, dt: float) -> float:
         """Calcula a velocidade Y baseada na curva de pulo."""
-        if self.is_jumping:
+        if self.is_pulando:
             # Inicia ou continua o pulo
-            if (not self.was_jumping and self.is_on_ground) or self.jump_time > 0.0:
+            if (not self.pulou and self.is_on_ground) or self.jump_time > 0.0:
                 if self.jump_time == 0.0:
-                    self.jump_sound.play()
+                    self.som_pulo.play()
 
                 self.jump_time += dt
-                self.sprite.play_animation(self.jump_animation)
+                self.sprite.play_animation(self.pulo_anim)
 
             # Se estamos na ascensão do pulo
-            if 0.0 < self.jump_time <= self.MAX_JUMP_TIME:
+            if 0.0 < self.jump_time <= self.TEMPO_PULO:
                 # Curva de poder para o controle preciso do pulo
-                velocity_y = self.JUMP_LAUNCH_VELOCITY * (
-                            1.0 - math.pow(self.jump_time / self.MAX_JUMP_TIME, self.JUMP_CONTROL_POWER))
+                velocity_y = self.PULO_VELOCIDADE * (
+                            1.0 - math.pow(self.jump_time / self.TEMPO_PULO, self.PULO_POTENCIA))
             else:
                 # Alcançou o ápice do pulo
                 self.jump_time = 0.0
@@ -184,12 +184,12 @@ class Player:
             # Cancela um pulo em progresso ou continua sem pular
             self.jump_time = 0.0
 
-        self.was_jumping = self.is_jumping
+        self.pulou = self.is_pulando
         return velocity_y
 
-    def handle_collisions(self):
+    def gerenciar_colisao(self):
         """Detecta e resolve todas as colisões entre o jogador e os blocos vizinhos."""
-        bounds = self.bounding_rectangle
+        bounds = self.limites
 
         # Mapeamento para o grid da matriz do Level
         left_tile = math.floor(bounds.left / Tile.WIDTH)
@@ -220,33 +220,33 @@ class Player:
 
                             # Ignora plataformas, a menos que estejamos no chão (caindo sobre elas)
                             if collision == TileCollision.IMPASSABLE or self.is_on_ground:
-                                self.position.y += depth.y
-                                bounds = self.bounding_rectangle
+                                self.posicao.y += depth.y
+                                bounds = self.limites
 
                         elif collision == TileCollision.IMPASSABLE:
                             # Resolve a colisão ao longo do eixo X
-                            self.position.x += depth.x
-                            bounds = self.bounding_rectangle
+                            self.posicao.x += depth.x
+                            bounds = self.limites
 
         self._previous_bottom = bounds.bottom
 
-    def on_killed(self, killed_by):  # killed_by do tipo 'Enemy' (ou None)
+    def morreu(self, killed_by):  # killed_by do tipo 'Enemy' (ou None)
         self.is_alive = False
         if killed_by is not None:
-            self.killed_sound.play()
+            self.som_perdeu.play()
         else:
-            self.fall_sound.play()
+            self.som_queda.play()
 
-        self.sprite.play_animation(self.die_animation)
+        self.sprite.play_animation(self.morte_anim)
 
-    def on_reached_exit(self):
-        self.sprite.play_animation(self.celebrate_animation)
+    def colidiu_saida(self):
+        self.sprite.play_animation(self.vitoria_anim)
 
     def draw(self, dt: float, screen: pygame.Surface):
         # Espelha a sprite baseado na direção do movimento
-        if self.velocity.x > 0:
+        if self.velocidade.x > 0:
             self.flip_x = False
-        elif self.velocity.x < 0:
+        elif self.velocidade.x < 0:
             self.flip_x = True
 
-        self.sprite.draw(dt, screen, self.position, self.flip_x)
+        self.sprite.draw(dt, screen, self.posicao, self.flip_x)
