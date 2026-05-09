@@ -245,8 +245,8 @@ class Player:
     def draw(self, dt: float, screen: pygame.Surface):
         # Espelha a sprite baseado na direção do movimento
         if self.velocity.x > 0:
-            self.flip_x = True
-        elif self.velocity.x < 0:
             self.flip_x = False
+        elif self.velocity.x < 0:
+            self.flip_x = True
 
         self.sprite.draw(dt, screen, self.position, self.flip_x)

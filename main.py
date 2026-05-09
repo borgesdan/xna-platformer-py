@@ -50,7 +50,7 @@ class PlatformerGame:
         self.perdeu_overlay = ContentManager.load_texture("Overlays/perdeu.png")
         self.morreu_overlay = ContentManager.load_texture("Overlays/morreu.png")
 
-        # Inicia a música de fundo (Equivalente ao MediaPlayer.IsRepeating = true)
+        # Inicia a música de fundo
         try:
             pygame.mixer.music.load("Content/Sounds/Music.mp3")
             pygame.mixer.music.play(loops=-1)  # -1 faz repetir infinitamente
