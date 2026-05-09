@@ -6,138 +6,126 @@ from level import Level
 
 
 class PlatformerGame:
-    """Este é o tipo principal do seu jogo."""
-
-    WARNING_TIME: float = 30.0
-    NUMBER_OF_LEVELS: int = 3
+    TEMPO_DE_AVISO: float = 30.0
+    NUMERO_DE_LEVELS: int = 3
 
     def __init__(self):
         # Inicializa todos os módulos do Pygame (Vídeo, Áudio, Eventos, etc.)
         pygame.init()
         pygame.mixer.init()
 
-        # O Platformer Starter Kit rodava originalmente em 800x480
-        self.screen_width = 800
-        self.screen_height = 480
-        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
-        pygame.display.set_caption("Platformer")
+        # Define o tamanho da tela
+        self.largura_janela = 800
+        self.altura_janela = 480
+        self.tela = pygame.display.set_mode((self.largura_janela, self.altura_janela))
+        pygame.display.set_caption("Jogo de plataforma")
 
-        self.clock = pygame.time.Clock()
-        self.is_running = True
+        self.relogio = pygame.time.Clock()
+        self.is_ativo = True
 
         # Recursos globais
         self.hud_font = None
-        self.win_overlay = None
-        self.lose_overlay = None
-        self.died_overlay = None
+        self.vitoria_overlay = None
+        self.perdeu_overlay = None
+        self.morreu_overlay = None
 
         # Estado meta-level
         self.level_index = -1
         self.level = None
-        self.was_continue_pressed = False
+        self.continue_pressionado = False
 
-        # O acumulador substitui o TotalGameTime do XNA
-        self.total_time = 0.0
 
-        self.load_content()
+        self.tempo_total = 0.0
 
-    def load_content(self):
-        """Carrega todo o conteúdo global do jogo."""
-        # No Pygame, carregar a fonte requer o tamanho desejado. 
-        # Assumindo que você tenha um arquivo .ttf. Caso não tenha, None usa a fonte padrão.
+        self.carregar_conteudo()
+
+    def carregar_conteudo(self):
         try:
-            self.hud_font = pygame.font.Font("Fonts/Hud.ttf", 36)
+            self.hud_font = pygame.font.Font("Content/Fonts/Hud.ttf", 36)
         except FileNotFoundError:
-            self.hud_font = pygame.font.Font(None, 36)  # Fallback seguro
+            self.hud_font = pygame.font.Font(None, 36)
 
         # Carrega as texturas de sobreposição
-        self.win_overlay = ContentManager.load_texture("Overlays/you_win.png")
-        self.lose_overlay = ContentManager.load_texture("Overlays/you_lose.png")
-        self.died_overlay = ContentManager.load_texture("Overlays/you_died.png")
+        self.vitoria_overlay = ContentManager.load_texture("Overlays/ganhou.png")
+        self.perdeu_overlay = ContentManager.load_texture("Overlays/perdeu.png")
+        self.morreu_overlay = ContentManager.load_texture("Overlays/morreu.png")
 
         # Inicia a música de fundo (Equivalente ao MediaPlayer.IsRepeating = true)
         try:
-            pygame.mixer.music.load("Sounds/Music.mp3")
+            pygame.mixer.music.load("Content/Sounds/Music.mp3")
             pygame.mixer.music.play(loops=-1)  # -1 faz repetir infinitamente
         except pygame.error:
             print("Aviso: Música de fundo não encontrada ou formato não suportado.")
 
-        self.load_next_level()
+        self.carregar_proximo_nivel()
 
-    def load_next_level(self):
-        """Move para o próximo nível."""
-        self.level_index = (self.level_index + 1) % self.NUMBER_OF_LEVELS
-
-        # O Pygame e o coletor de lixo do Python gerenciam o Dispose de texturas antigas 
-        # automaticamente quando perdemos a referência, desde que não estejam no ContentManager.
+    def carregar_proximo_nivel(self):
+        #move para o próximo nível
+        self.level_index = (self.level_index + 1) % self.NUMERO_DE_LEVELS
         level_path = f"Levels/{self.level_index}.txt"
-
-        # Passamos o path em vez de um Stream
         self.level = Level(level_path, self.level_index)
 
-    def reload_current_level(self):
+    def recarregar_nivel(self):
         self.level_index -= 1
-        self.load_next_level()
+        self.carregar_proximo_nivel()
 
-    def handle_input(self):
-        """Lida com a fila de eventos e comandos de alto nível (Voltar/Continuar)."""
+    def gerenciar_input(self):
         continue_pressed = False
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                self.is_running = False
+                self.is_ativo = False
 
             # Mapeamento do teclado para cliques únicos
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    self.is_running = False
+                    self.is_ativo = False
                 if event.key == pygame.K_SPACE or event.key == pygame.K_RETURN:
                     continue_pressed = True
 
         # Executa a ação apropriada para avançar o jogo e retornar o jogador à ação
-        if not self.was_continue_pressed and continue_pressed:
+        if not self.continue_pressionado and continue_pressed:
             if not self.level.player.is_alive:
                 self.level.start_new_life()
             elif self.level.time_remaining == 0.0:
                 if self.level.reached_exit:
-                    self.load_next_level()
+                    self.carregar_proximo_nivel()
                 else:
-                    self.reload_current_level()
+                    self.recarregar_nivel()
 
-        self.was_continue_pressed = continue_pressed
+        self.continue_pressionado = continue_pressed
 
     def update(self, dt: float):
         """Atualiza a lógica do nível."""
-        self.handle_input()
-        self.level.update(dt, self.total_time)
+        self.gerenciar_input()
+        self.level.update(dt, self.tempo_total)
 
-    def draw(self):
+    def draw(self, dt: float): # <- Adicione o parâmetro dt aqui
         """Desenha o jogo, do fundo ao primeiro plano."""
         # Limpa a tela com CornflowerBlue
-        self.screen.fill((100, 149, 237))
+        self.tela.fill((100, 149, 237))
 
-        # Chama o draw do level
-        self.level.draw(0, self.screen)  # dt não é estritamente necessário no draw na maioria dos casos
+        # Passa o 'dt' real para o nível atualizar os AnimationPlayers
+        self.level.draw(dt, self.tela)
 
-        self.draw_hud()
+        self.desenhar_hud()
 
-        # Apresenta (Flip) o backbuffer para a tela (Equivalente ao GraphicsDevice.Present)
         pygame.display.flip()
 
-    def draw_hud(self):
+    def desenhar_hud(self):
         """Desenha o tempo, pontuação e overlays."""
         # Área de segurança simulada
         margin_x, margin_y = 20, 20
-        center_x = self.screen_width / 2.0
-        center_y = self.screen_height / 2.0
+        center_x = self.largura_janela / 2.0
+        center_y = self.altura_janela / 2.0
 
         # Formata o tempo restante (MM:SS)
         minutes = int(self.level.time_remaining // 60)
         seconds = int(self.level.time_remaining % 60)
-        time_string = f"TIME: {minutes:02}:{seconds:02}"
+        time_string = f"TEMPO: {minutes:02}:{seconds:02}"
 
         # Lógica de piscar o tempo (usa módulo da divisão inteira)
-        if (self.level.time_remaining > self.WARNING_TIME or
+        if (self.level.time_remaining > self.TEMPO_DE_AVISO or
                 self.level.reached_exit or
                 int(self.level.time_remaining) % 2 == 0):
             time_color = (255, 255, 0)  # Amarelo
@@ -145,61 +133,59 @@ class PlatformerGame:
             time_color = (255, 0, 0)  # Vermelho
 
         # Desenha o tempo
-        self.draw_shadowed_string(time_string, (margin_x, margin_y), time_color)
+        self.desenhar_string_sombra(time_string, (margin_x, margin_y), time_color)
 
         # Desenha a pontuação logo abaixo do tempo
         # Em Pygame, font.size retorna (width, height)
         text_width, text_height = self.hud_font.size(time_string)
         score_string = f"SCORE: {self.level.score}"
-        self.draw_shadowed_string(score_string, (margin_x, margin_y + text_height * 1.2), (255, 255, 0))
+        self.desenhar_string_sombra(score_string, (margin_x, margin_y + text_height * 1.2), (255, 255, 0))
 
         # Determina o overlay de status a ser mostrado
         status_texture = None
         if self.level.time_remaining == 0.0:
             if self.level.reached_exit:
-                status_texture = self.win_overlay
+                status_texture = self.vitoria_overlay
             else:
-                status_texture = self.lose_overlay
+                status_texture = self.perdeu_overlay
         elif not self.level.player.is_alive:
-            status_texture = self.died_overlay
+            status_texture = self.morreu_overlay
 
         if status_texture is not None:
             # Centraliza o overlay
             status_rect = status_texture.get_rect(center=(center_x, center_y))
-            self.screen.blit(status_texture, status_rect)
+            self.tela.blit(status_texture, status_rect)
 
-    def draw_shadowed_string(self, text: str, position: tuple, color: tuple):
+    def desenhar_string_sombra(self, text: str, position: tuple, color: tuple):
         """Renderiza um texto com uma sombra preta atrás."""
         # Sombra (Offset de +2 pixels em X e Y para melhor visibilidade em vez de 1.0f)
         shadow_surface = self.hud_font.render(text, True, (0, 0, 0))
-        self.screen.blit(shadow_surface, (position[0] + 2, position[1] + 2))
+        self.tela.blit(shadow_surface, (position[0] + 2, position[1] + 2))
 
         # Texto principal
         text_surface = self.hud_font.render(text, True, color)
-        self.screen.blit(text_surface, position)
+        self.tela.blit(text_surface, position)
 
-    def run(self):
-        """O Loop principal do jogo."""
-        while self.is_running:
-            # O XNA tenta rodar o Update a 60 vezes por segundo (IsFixedTimeStep)
-            # clock.tick(60) trava o framerate a 60 FPS e retorna o tempo em milissegundos
-            ms = self.clock.tick(60)
+    def executar_jogo(self):
+        #loop principal
+        while self.is_ativo:
+            ms = self.relogio.tick(60)
             dt = ms / 1000.0
 
             # Limite de segurança para o delta time caso a janela seja arrastada e trave
             if dt > 0.1:
                 dt = 0.1
 
-            self.total_time += dt
+            self.tempo_total += dt
 
             self.update(dt)
-            self.draw()
+            self.draw(dt)
 
-        # Encerra o jogo graciosamente
+        # Encerra o jogo
         pygame.quit()
         sys.exit()
 
 
 if __name__ == "__main__":
     game = PlatformerGame()
-    game.run()
+    game.executar_jogo()

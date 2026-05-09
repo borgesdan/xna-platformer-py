@@ -84,9 +84,9 @@ class Player:
         self._local_bounds = pygame.Rect(left, top, width, height)
 
         # Carrega sons (Assumindo que você inicializou o pygame.mixer)
-        self.killed_sound = ContentManager.load_sound("Sounds/PlayerKilled.wav")
-        self.jump_sound = ContentManager.load_sound("Sounds/PlayerJump.wav")
-        self.fall_sound = ContentManager.load_sound("Sounds/PlayerFall.wav")
+        self.killed_sound = ContentManager.load_sound("Sounds/STAY_SE_00016.wav")
+        self.jump_sound = ContentManager.load_sound("Sounds/STAY_SE_00010.wav")
+        self.fall_sound = ContentManager.load_sound("Sounds/STAY_SE_00016.wav")
 
     def reset(self, position: pygame.math.Vector2):
         """Ressuscita e reposiciona o jogador."""
@@ -245,8 +245,8 @@ class Player:
     def draw(self, dt: float, screen: pygame.Surface):
         # Espelha a sprite baseado na direção do movimento
         if self.velocity.x > 0:
-            self.flip_x = False
-        elif self.velocity.x < 0:
             self.flip_x = True
+        elif self.velocity.x < 0:
+            self.flip_x = False
 
         self.sprite.draw(dt, screen, self.position, self.flip_x)

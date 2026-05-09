@@ -39,7 +39,7 @@ class Gem:
 
     def load_content(self):
         """Carrega a textura da gema, aplica a cor e carrega o som."""
-        base_texture = ContentManager.load_texture("Sprites/Gem.png")
+        base_texture = ContentManager.load_texture("Sprites/Item.png")
 
         # OTIMIZAÇÃO: Copiamos a textura base e a tingimos com a cor amarela no momento
         # do carregamento. O 'BLEND_RGBA_MULT' multiplica os pixels, preservando transparência.
@@ -49,7 +49,7 @@ class Gem:
         self.origin = pygame.math.Vector2(self.texture.get_width() / 2.0, self.texture.get_height() / 2.0)
 
         # Agora o áudio passa pelo gerenciador e ganha o prefixo "Content/"
-        self.collected_sound = ContentManager.load_sound("Sounds/GemCollected.wav")
+        self.collected_sound = ContentManager.load_sound("Sounds/STAY_SE_00033.wav")
 
     def update(self, total_time: float):
         """

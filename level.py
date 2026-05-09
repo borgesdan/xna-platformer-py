@@ -54,7 +54,7 @@ class Level:
             self.layers.append(ContentManager.load_texture(bg_path))
 
         # Carrega o som
-        self.exit_reached_sound = ContentManager.load_sound("Sounds/ExitReached.wav")
+        self.exit_reached_sound = ContentManager.load_sound("Sounds/TITLE_SE_00000.wav")
 
     def _load_tiles(self, file_path: str):
         """Lê o arquivo de texto e constrói a matriz de tiles."""
