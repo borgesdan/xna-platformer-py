@@ -6,186 +6,243 @@ from level import Level
 
 
 class PlatformerGame:
-    TEMPO_DE_AVISO: float = 30.0
-    NUMERO_DE_LEVELS: int = 3
+    """Este é o tipo principal do seu jogo."""
+
+    WARNING_TIME: float = 30.0
+    NUMBER_OF_LEVELS: int = 3
 
     def __init__(self):
-        # Inicializa todos os módulos do Pygame (Vídeo, Áudio, Eventos, etc.)
+        # Inicializa todos os módulos do Pygame
         pygame.init()
         pygame.mixer.init()
 
-        # Define o tamanho da tela
-        self.largura_janela = 800
-        self.altura_janela = 480
-        self.tela = pygame.display.set_mode((self.largura_janela, self.altura_janela))
-        pygame.display.set_caption("Jogo de plataforma")
+        self.screen_width = 800
+        self.screen_height = 480
+        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        pygame.display.set_caption("Jogo de Plataforma")
 
-        self.relogio = pygame.time.Clock()
-        self.is_ativo = True
+        self.clock = pygame.time.Clock()
+        self.is_running = True
+
+        # --- MÁQUINA DE ESTADOS ---
+        self.state = "MENU"
+        self.menu_selected_index = 0
 
         # Recursos globais
         self.hud_font = None
-        self.vitoria_overlay = None
-        self.perdeu_overlay = None
-        self.morreu_overlay = None
+        self.title_font = None
+        self.win_overlay = None
+        self.lose_overlay = None
+        self.died_overlay = None
 
         # Estado meta-level
         self.level_index = -1
         self.level = None
-        self.continue_pressionado = False
+        self.was_continue_pressed = False
 
+        self.total_time = 0.0
 
-        self.tempo_total = 0.0
+        self.load_content()
 
-        self.carregar_conteudo()
-
-    def carregar_conteudo(self):
+    def load_content(self):
+        """Carrega todo o conteúdo global do jogo."""
+        # Fontes: Uma para o HUD (padrão) e uma maior para o Título do Menu
         try:
-            self.hud_font = pygame.font.Font("Content/Fonts/Hud.ttf", 36)
+            self.hud_font = pygame.font.Font("Fonts/Hud.ttf", 36)
+            self.title_font = pygame.font.Font("Fonts/Hud.ttf", 72)
         except FileNotFoundError:
             self.hud_font = pygame.font.Font(None, 36)
+            self.title_font = pygame.font.Font(None, 72)
 
-        # Carrega as texturas de sobreposição
-        self.vitoria_overlay = ContentManager.load_texture("Overlays/ganhou.png")
-        self.perdeu_overlay = ContentManager.load_texture("Overlays/perdeu.png")
-        self.morreu_overlay = ContentManager.load_texture("Overlays/morreu.png")
+            # Overlays
+        self.win_overlay = ContentManager.load_texture("Overlays/ganhou.png")
+        self.lose_overlay = ContentManager.load_texture("Overlays/morreu.png")
+        self.died_overlay = ContentManager.load_texture("Overlays/perdeu.png")
 
-        # Inicia a música de fundo
+        # Música
         try:
-            pygame.mixer.music.load("Content/Sounds/Music.mp3")
-            pygame.mixer.music.play(loops=-1)  # -1 faz repetir infinitamente
+            music_path = ContentManager.get_full_path("Sounds/Music.mp3")
+            pygame.mixer.music.load(music_path)
+            pygame.mixer.music.play(loops=-1)
         except pygame.error:
             print("Aviso: Música de fundo não encontrada ou formato não suportado.")
 
-        self.carregar_proximo_nivel()
+        self.load_next_level()
 
-    def carregar_proximo_nivel(self):
-        #move para o próximo nível
-        self.level_index = (self.level_index + 1) % self.NUMERO_DE_LEVELS
+    def load_next_level(self):
+        self.level_index = (self.level_index + 1) % self.NUMBER_OF_LEVELS
         level_path = f"Levels/{self.level_index}.txt"
         self.level = Level(level_path, self.level_index)
 
-    def recarregar_nivel(self):
+    def reload_current_level(self):
         self.level_index -= 1
-        self.carregar_proximo_nivel()
-
-    def gerenciar_input(self):
-        continue_pressed = False
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.is_ativo = False
-
-            # Mapeamento do teclado para cliques únicos
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    self.is_ativo = False
-                if event.key == pygame.K_SPACE or event.key == pygame.K_RETURN:
-                    continue_pressed = True
-
-        # Executa a ação apropriada para avançar o jogo e retornar o jogador à ação
-        if not self.continue_pressionado and continue_pressed:
-            if not self.level.player.is_alive:
-                self.level.start_new_life()
-            elif self.level.time_remaining == 0.0:
-                if self.level.reached_exit:
-                    self.carregar_proximo_nivel()
-                else:
-                    self.recarregar_nivel()
-
-        self.continue_pressionado = continue_pressed
+        self.load_next_level()
 
     def update(self, dt: float):
-        """Atualiza a lógica do nível."""
-        self.gerenciar_input()
-        self.level.update(dt, self.tempo_total)
+        """Atualiza a lógica dependendo do estado atual."""
+        continue_pressed = False
 
-    def draw(self, dt: float): # <- Adicione o parâmetro dt aqui
-        """Desenha o jogo, do fundo ao primeiro plano."""
-        # Limpa a tela com CornflowerBlue
-        self.tela.fill((100, 149, 237))
+        # Centraliza o processamento de eventos do OS
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.is_running = False
 
-        # Passa o 'dt' real para o nível atualizar os AnimationPlayers
-        self.level.draw(dt, self.tela)
+            # --- LÓGICA DO MENU ---
+            if self.state == "MENU":
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_UP:
+                        self.menu_selected_index = (self.menu_selected_index - 1) % 2
+                    elif event.key == pygame.K_DOWN:
+                        self.menu_selected_index = (self.menu_selected_index + 1) % 2
+                    elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                        if self.menu_selected_index == 0:  # Iniciar
+                            self.state = "PLAYING"
+                        elif self.menu_selected_index == 1:  # Sair
+                            self.is_running = False
 
-        self.desenhar_hud()
+            # --- LÓGICA DE GAMEPLAY ---
+            elif self.state == "PLAYING":
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        self.state = "MENU"  # ESC agora pausa o jogo e volta pro Menu
+                    if event.key == pygame.K_SPACE or event.key == pygame.K_RETURN:
+                        continue_pressed = True
+
+        # Executa a física e a atualização apenas se estiver jogando
+        if self.state == "PLAYING":
+            if not self.was_continue_pressed and continue_pressed:
+                if not self.level.player.is_alive:
+                    self.level.start_new_life()
+                elif self.level.time_remaining == 0.0:
+                    if self.level.reached_exit:
+                        self.load_next_level()
+                    else:
+                        self.reload_current_level()
+
+            self.was_continue_pressed = continue_pressed
+            self.level.update(dt, self.total_time)
+
+    def draw(self, dt: float):
+        """Desenha o jogo, roteando para a UI correta dependendo do estado."""
+        self.screen.fill((100, 149, 237))
+
+        # Renderizamos o nível independentemente do estado.
+        # Se for MENU, passamos dt=0 para que os bonecos não se mexam no fundo!
+        if self.level is not None:
+            tempo_frame = dt if self.state == "PLAYING" else 0
+            self.level.draw(tempo_frame, self.screen)
+
+        # Camadas superiores
+        if self.state == "MENU":
+            # Película escura para dar destaque ao menu
+            overlay = pygame.Surface((self.screen_width, self.screen_height))
+            overlay.set_alpha(150)  # 0 é transparente, 255 é opaco
+            overlay.fill((0, 0, 0))
+            self.screen.blit(overlay, (0, 0))
+
+            self.draw_menu()
+        elif self.state == "PLAYING":
+            self.draw_hud()
 
         pygame.display.flip()
 
-    def desenhar_hud(self):
-        """Desenha o tempo, pontuação e overlays."""
-        # Área de segurança simulada
-        margin_x, margin_y = 20, 20
-        center_x = self.largura_janela / 2.0
-        center_y = self.altura_janela / 2.0
+    def draw_menu(self):
+        """Desenha a tela inicial (Título, Botões e Controles)."""
+        center_x = self.screen_width / 2.0
 
-        # Formata o tempo restante (MM:SS)
+        # Título
+        title_text = "SUPER PLATAFORMA"
+        title_width, _ = self.title_font.size(title_text)
+        self.draw_shadowed_string(title_text, (center_x - title_width / 2, 70), (255, 255, 255), self.title_font)
+
+        # Opções do Menu
+        options = ["Iniciar ", "  Sair  "]
+        for i, option in enumerate(options):
+            color = (255, 255, 0) if i == self.menu_selected_index else (255, 255, 255)
+            # Adiciona setinhas laterais na opção selecionada
+            text = f"> {option} <" if i == self.menu_selected_index else option
+
+            text_w, _ = self.hud_font.size(text)
+            self.draw_shadowed_string(text, (center_x - text_w / 2, 220 + i * 50), color, self.hud_font)
+
+        # Seção de Controles
+        controls = [
+            "Controles:",
+            "<- e -> : Andar",
+            "Espaço : Pular/Selecionar",
+            "ESC : Menu"
+        ]
+
+        for i, line in enumerate(controls):
+            line_w, _ = self.hud_font.size(line)
+            # Renderiza os controles um pouco mais abaixo com uma cor cinza (200, 200, 200)
+            self.draw_shadowed_string(line, (center_x - line_w / 2, 340 + i * 30), (200, 200, 200), self.hud_font)
+
+    def draw_hud(self):
+        """Desenha o tempo, pontuação e overlays do jogo."""
+        margin_x, margin_y = 20, 20
+        center_x = self.screen_width / 2.0
+        center_y = self.screen_height / 2.0
+
         minutes = int(self.level.time_remaining // 60)
         seconds = int(self.level.time_remaining % 60)
-        time_string = f"TEMPO: {minutes:02}:{seconds:02}"
+        time_string = f"TIME: {minutes:02}:{seconds:02}"
 
-        # Lógica de piscar o tempo (usa módulo da divisão inteira)
-        if (self.level.time_remaining > self.TEMPO_DE_AVISO or
+        if (self.level.time_remaining > self.WARNING_TIME or
                 self.level.reached_exit or
                 int(self.level.time_remaining) % 2 == 0):
-            time_color = (255, 255, 0)  # Amarelo
+            time_color = (255, 255, 0)
         else:
-            time_color = (255, 0, 0)  # Vermelho
+            time_color = (255, 0, 0)
 
-        # Desenha o tempo
-        self.desenhar_string_sombra(time_string, (margin_x, margin_y), time_color)
+        self.draw_shadowed_string(time_string, (margin_x, margin_y), time_color, self.hud_font)
 
-        # Desenha a pontuação logo abaixo do tempo
-        # Em Pygame, font.size retorna (width, height)
-        text_width, text_height = self.hud_font.size(time_string)
+        _, text_height = self.hud_font.size(time_string)
         score_string = f"SCORE: {self.level.score}"
-        self.desenhar_string_sombra(score_string, (margin_x, margin_y + text_height * 1.2), (255, 255, 0))
+        self.draw_shadowed_string(score_string, (margin_x, margin_y + text_height * 1.2), (255, 255, 0), self.hud_font)
 
-        # Determina o overlay de status a ser mostrado
         status_texture = None
         if self.level.time_remaining == 0.0:
             if self.level.reached_exit:
-                status_texture = self.vitoria_overlay
+                status_texture = self.win_overlay
             else:
-                status_texture = self.perdeu_overlay
+                status_texture = self.lose_overlay
         elif not self.level.player.is_alive:
-            status_texture = self.morreu_overlay
+            status_texture = self.died_overlay
 
         if status_texture is not None:
-            # Centraliza o overlay
             status_rect = status_texture.get_rect(center=(center_x, center_y))
-            self.tela.blit(status_texture, status_rect)
+            self.screen.blit(status_texture, status_rect)
 
-    def desenhar_string_sombra(self, text: str, position: tuple, color: tuple):
+    # Modificamos a função para aceitar a fonte como parâmetro opcional
+    def draw_shadowed_string(self, text: str, position: tuple, color: tuple, font: pygame.font.Font):
         """Renderiza um texto com uma sombra preta atrás."""
-        # Sombra (Offset de +2 pixels em X e Y para melhor visibilidade em vez de 1.0f)
-        shadow_surface = self.hud_font.render(text, True, (0, 0, 0))
-        self.tela.blit(shadow_surface, (position[0] + 2, position[1] + 2))
+        shadow_surface = font.render(text, True, (0, 0, 0))
+        self.screen.blit(shadow_surface, (position[0] + 2, position[1] + 2))
 
-        # Texto principal
-        text_surface = self.hud_font.render(text, True, color)
-        self.tela.blit(text_surface, position)
+        text_surface = font.render(text, True, color)
+        self.screen.blit(text_surface, position)
 
-    def executar_jogo(self):
-        #loop principal
-        while self.is_ativo:
-            ms = self.relogio.tick(60)
+    def run(self):
+        """O Loop principal do jogo."""
+        while self.is_running:
+            ms = self.clock.tick(60)
             dt = ms / 1000.0
 
-            # Limite de segurança para o delta time caso a janela seja arrastada e trave
             if dt > 0.1:
                 dt = 0.1
 
-            self.tempo_total += dt
+            # Só incrementa o tempo global se o jogo estiver rodando (Pausa a música nas gemas também)
+            if self.state == "PLAYING":
+                self.total_time += dt
 
             self.update(dt)
             self.draw(dt)
 
-        # Encerra o jogo
         pygame.quit()
         sys.exit()
 
 
 if __name__ == "__main__":
     game = PlatformerGame()
-    game.executar_jogo()
+    game.run()
